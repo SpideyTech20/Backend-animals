@@ -1,16 +1,18 @@
 require("dotenv").config();
+
 const express = require("express");
-const pool = require("./database"); // <-- 1. Make sure this is uncommented
+const cors = require("cors");
+const path = require("path");
+const pool = require("./database");
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.use(cors());
 app.use(express.json());
-
 // Root route
-app.get("/", (request, response) => {
-    response.json({
-        message: "Task API is running",
-    });
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
 
