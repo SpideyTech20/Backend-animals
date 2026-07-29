@@ -72,11 +72,14 @@ app.get("/animals/:id", async (req, res) => {
 
         res.json(animals[0]);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            message: "Unable to retrieve animal"
-        });
-    }
+    console.error(error);
+
+    res.status(500).json({
+        message: error.message,
+        code: error.code,
+        sql: error.sql
+    });
+}
 });
 
 // POST animal
