@@ -19,8 +19,18 @@ app.use(express.json());
 
 // Root route
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "frontend", "index.html"));
+    res.json({
+        message: "Animal API is running!",
+        endpoints: {
+            getAll: "/animals",
+            getOne: "/animals/:id",
+            create: "POST /animals",
+            update: "PUT /animals/:id",
+            delete: "DELETE /animals/:id"
+        }
+    });
 });
+
 
 // GET all animals
 app.get("/animals", async (req, res) => {
