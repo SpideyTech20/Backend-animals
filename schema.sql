@@ -1,13 +1,12 @@
-CREATE TABLE IF NOT EXISTS tasks (
+CREATE TABLE IF NOT EXISTS animals (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    completed BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP
+    name VARCHAR(255) NOT NULL,
+    num_legs INT NOT NULL
 );
 
-INSERT INTO tasks (title, completed)
+INSERT INTO animals (name, num_legs)
 VALUES
-('Learn Node.js', FALSE),
-('Connect Express to MySQL', FALSE);
+('DOG', 4),
+('CAT', 4),
+('SPIDER', 8),
+('CHICKEN', 2);
