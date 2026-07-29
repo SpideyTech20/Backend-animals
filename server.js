@@ -5,20 +5,28 @@ const cors = require("cors");
 const path = require("path");
 const pool = require("./database");
 
+// Debug logs
+console.log("Pool:", pool);
+console.log("Type:", typeof pool);
+console.log("getConnection:", typeof pool.getConnection);
+console.log("execute:", typeof pool.execute);
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(cors());
 app.use(express.json());
+
 // Root route
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
-
+// GET all animals
 app.get("/animals", async (req, res) => {
     try {
         const { numLegs } = req.query;
+
         let query = "SELECT id, name, num_legs AS numLegs FROM animals";
         let params = [];
 
@@ -28,6 +36,7 @@ app.get("/animals", async (req, res) => {
         }
 
         const [animals] = await pool.execute(query, params);
+
         res.json({ animals });
     } catch (error) {
         console.error(error);
@@ -35,33 +44,40 @@ app.get("/animals", async (req, res) => {
     }
 });
 
-
+// GET animal by ID
 app.get("/animals/:id", async (req, res) => {
     try {
         const id = Number(req.params.id);
+
         const [animals] = await pool.execute(
             "SELECT id, name, num_legs AS numLegs FROM animals WHERE id = ?",
             [id]
         );
 
         if (animals.length === 0) {
-            return res.status(404).json({ message: "Animal not found" });
+            return res.status(404).json({
+                message: "Animal not found"
+            });
         }
 
         res.json(animals[0]);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Unable to retrieve animal" });
+        res.status(500).json({
+            message: "Unable to retrieve animal"
+        });
     }
 });
 
-
+// POST animal
 app.post("/animals", async (req, res) => {
     try {
         const { name, numLegs } = req.body;
 
         if (!name || numLegs === undefined) {
-            return res.status(400).json({ message: "name and numLegs are required" });
+            return res.status(400).json({
+                message: "name and numLegs are required"
+            });
         }
 
         const formattedName = name.trim().toUpperCase();
@@ -80,13 +96,16 @@ app.post("/animals", async (req, res) => {
             message: "Animal added",
             animal: newAnimal[0]
         });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Unable to create animal" });
+        res.status(500).json({
+            message: "Unable to create animal"
+        });
     }
 });
 
-
+// PUT animal
 app.put("/animals/:id", async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -98,7 +117,9 @@ app.put("/animals/:id", async (req, res) => {
         );
 
         if (existing.length === 0) {
-            return res.status(404).json({ message: "Animal not found" });
+            return res.status(404).json({
+                message: "Animal not found"
+            });
         }
 
         let updatedName = existing[0].name;
@@ -107,6 +128,7 @@ app.put("/animals/:id", async (req, res) => {
         if (name !== undefined) {
             updatedName = name.trim().toUpperCase();
         }
+
         if (numLegs !== undefined) {
             updatedNumLegs = Number(numLegs);
         }
@@ -125,13 +147,16 @@ app.put("/animals/:id", async (req, res) => {
             message: "Animal updated",
             animal: updatedAnimal[0]
         });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Unable to update animal" });
+        res.status(500).json({
+            message: "Unable to update animal"
+        });
     }
 });
 
-
+// DELETE animal
 app.delete("/animals/:id", async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -142,27 +167,39 @@ app.delete("/animals/:id", async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Animal not found" });
+            return res.status(404).json({
+                message: "Animal not found"
+            });
         }
 
-        res.json({ message: "Animal deleted successfully" });
+        res.json({
+            message: "Animal deleted successfully"
+        });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Unable to delete animal" });
+        res.status(500).json({
+            message: "Unable to delete animal"
+        });
     }
 });
 
+// Test database connection and start server
+async function startServer() {
+    try {
+        const connection = await pool.getConnection();
 
+        console.log("✅ Connected to MySQL!");
+        connection.release();
 
-async function testConnection() {
-  try {
-    const connection = await pool.getConnection();
-    console.log("Connected to MySQL!");
-    connection.release();
-  } catch (err) {
-    console.error("Unable to connect to MySQL:", err.message);
-    process.exit(1);
-  }
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+        });
+
+    } catch (err) {
+        console.error("Unable to connect to MySQL:", err);
+        process.exit(1);
+    }
 }
 
-testConnection();
+startServer();
