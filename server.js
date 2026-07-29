@@ -2,28 +2,21 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const pool = require("./database");
 
-// Debug logs
-console.log("Pool:", pool);
-console.log("Type:", typeof pool);
-console.log("getConnection:", typeof pool.getConnection);
-console.log("execute:", typeof pool.execute);
-
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// Root route
+// Home
 app.get("/", (req, res) => {
     res.json({
         message: "Animal API is running!",
         endpoints: {
-            getAll: "/animals",
-            getOne: "/animals/:id",
+            getAll: "GET /animals",
+            getOne: "GET /animals/:id",
             create: "POST /animals",
             update: "PUT /animals/:id",
             delete: "DELETE /animals/:id"
@@ -31,37 +24,41 @@ app.get("/", (req, res) => {
     });
 });
 
-
 // GET all animals
 app.get("/animals", async (req, res) => {
     try {
         const { numLegs } = req.query;
 
-        let query = "SELECT id, name, num_legs AS numLegs FROM animals";
-        let params = [];
+        let sql = "SELECT id, name, num_legs AS numLegs FROM animals";
+        const params = [];
 
         if (numLegs !== undefined) {
-            query += " WHERE num_legs = ?";
+            sql += " WHERE num_legs = ?";
             params.push(Number(numLegs));
         }
 
-        const [animals] = await pool.execute(query, params);
+        const [animals] = await pool.execute(sql, params);
 
         res.json({ animals });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Unable to retrieve animals" });
+
+        res.status(500).json({
+            message: error.message,
+            code: error.code,
+            sql: error.sql
+        });
     }
 });
 
-// GET animal by ID
+// GET animal by id
 app.get("/animals/:id", async (req, res) => {
     try {
-        const id = Number(req.params.id);
 
         const [animals] = await pool.execute(
-            "SELECT id, name, num_legs AS numLegs FROM animals WHERE id = ?",
-            [id]
+            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
+            [req.params.id]
         );
 
         if (animals.length === 0) {
@@ -71,20 +68,25 @@ app.get("/animals/:id", async (req, res) => {
         }
 
         res.json(animals[0]);
-    } catch (error) {
-    console.error(error);
 
-    res.status(500).json({
-        message: error.message,
-        code: error.code,
-        sql: error.sql
-    });
-}
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            message: error.message,
+            code: error.code,
+            sql: error.sql
+        });
+
+    }
 });
 
-// POST animal
+// POST
 app.post("/animals", async (req, res) => {
+
     try {
+
         const { name, numLegs } = req.body;
 
         if (!name || numLegs === undefined) {
@@ -93,90 +95,95 @@ app.post("/animals", async (req, res) => {
             });
         }
 
-        const formattedName = name.trim().toUpperCase();
-
         const [result] = await pool.execute(
-            "INSERT INTO animals (name, num_legs) VALUES (?, ?)",
-            [formattedName, Number(numLegs)]
+            "INSERT INTO animals(name,num_legs) VALUES(?,?)",
+            [name.trim().toUpperCase(), Number(numLegs)]
         );
 
-        const [newAnimal] = await pool.execute(
-            "SELECT id, name, num_legs AS numLegs FROM animals WHERE id = ?",
+        const [animal] = await pool.execute(
+            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
             [result.insertId]
         );
 
         res.status(201).json({
             message: "Animal added",
-            animal: newAnimal[0]
+            animal: animal[0]
         });
 
     } catch (error) {
+
         console.error(error);
+
         res.status(500).json({
-            message: "Unable to create animal"
+            message: error.message,
+            code: error.code,
+            sql: error.sql
         });
+
     }
+
 });
 
-// PUT animal
+// PUT
 app.put("/animals/:id", async (req, res) => {
+
     try {
-        const id = Number(req.params.id);
+
+        const id = req.params.id;
         const { name, numLegs } = req.body;
 
-        const [existing] = await pool.execute(
-            "SELECT id, name, num_legs AS numLegs FROM animals WHERE id = ?",
+        const [rows] = await pool.execute(
+            "SELECT * FROM animals WHERE id=?",
             [id]
         );
 
-        if (existing.length === 0) {
+        if (rows.length === 0) {
             return res.status(404).json({
                 message: "Animal not found"
             });
         }
 
-        let updatedName = existing[0].name;
-        let updatedNumLegs = existing[0].numLegs;
-
-        if (name !== undefined) {
-            updatedName = name.trim().toUpperCase();
-        }
-
-        if (numLegs !== undefined) {
-            updatedNumLegs = Number(numLegs);
-        }
+        const updatedName = name ? name.trim().toUpperCase() : rows[0].name;
+        const updatedLegs =
+            numLegs !== undefined ? Number(numLegs) : rows[0].num_legs;
 
         await pool.execute(
-            "UPDATE animals SET name = ?, num_legs = ? WHERE id = ?",
-            [updatedName, updatedNumLegs, id]
+            "UPDATE animals SET name=?,num_legs=? WHERE id=?",
+            [updatedName, updatedLegs, id]
         );
 
-        const [updatedAnimal] = await pool.execute(
-            "SELECT id, name, num_legs AS numLegs FROM animals WHERE id = ?",
+        const [updated] = await pool.execute(
+            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
             [id]
         );
 
         res.json({
             message: "Animal updated",
-            animal: updatedAnimal[0]
+            animal: updated[0]
         });
 
     } catch (error) {
+
         console.error(error);
+
         res.status(500).json({
-            message: "Unable to update animal"
+            message: error.message,
+            code: error.code,
+            sql: error.sql
         });
+
     }
+
 });
 
-// DELETE animal
+// DELETE
 app.delete("/animals/:id", async (req, res) => {
+
     try {
-        const id = Number(req.params.id);
 
         const [result] = await pool.execute(
-            "DELETE FROM animals WHERE id = ?",
-            [id]
+            "DELETE FROM animals WHERE id=?",
+            [req.params.id]
         );
 
         if (result.affectedRows === 0) {
@@ -190,29 +197,42 @@ app.delete("/animals/:id", async (req, res) => {
         });
 
     } catch (error) {
+
         console.error(error);
+
         res.status(500).json({
-            message: "Unable to delete animal"
+            message: error.message,
+            code: error.code,
+            sql: error.sql
         });
+
     }
+
 });
 
-// Test database connection and start server
+// Start server
 async function startServer() {
+
     try {
+
         const connection = await pool.getConnection();
 
         console.log("✅ Connected to MySQL!");
+
         connection.release();
 
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
         });
 
-    } catch (err) {
-        console.error("Unable to connect to MySQL:", err);
+    } catch (error) {
+
+        console.error(error);
+
         process.exit(1);
+
     }
+
 }
 
 startServer();
