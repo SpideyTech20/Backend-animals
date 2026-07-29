@@ -154,19 +154,15 @@ app.delete("/animals/:id", async (req, res) => {
 
 
 
-async function startServer() {
-    try {
-        const connection = await pool.getConnection();
-        console.log("Connected to MySQL successfully");
-        connection.release();
-
-        app.listen(PORT, () => {
-            console.log(`Server is running at http://localhost:${PORT}`);
-        });
-    } catch (error) {
-        console.error("Unable to connect to MySQL:", error.message);
-        process.exit(1);
-    }
+async function testConnection() {
+  try {
+    const connection = await pool.getConnection();
+    console.log("Connected to MySQL!");
+    connection.release();
+  } catch (err) {
+    console.error("Unable to connect to MySQL:", err.message);
+    process.exit(1);
+  }
 }
 
-startServer();
+testConnection();
