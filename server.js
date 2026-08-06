@@ -1,238 +1,73 @@
-require("dotenv").config();
+// Load environment variables from .env file into process.env
+// The `override: true` option ensures that .env values override existing env vars
+import dotenv from "dotenv";
+dotenv.config({ override: true });
 
-const express = require("express");
-const cors = require("cors");
-const pool = require("./database");
+// Import core Express and CORS middleware
+import express from "express";
+import cors from "cors";
 
+// Import route handlers for animals and authentication
+import animalRoutes from "./routes/animalRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+
+// Create the Express app instance
 const app = express();
-const PORT = process.env.PORT || 3000;
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
 
-app.use(cors());
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
+// Define the port – uses PORT from .env or defaults to 5000
+const PORT = process.env.PORT || 5000;
+
+// ---------- CORS Configuration ----------
+// This allows your frontend (e.g., running on port 5500) to call this API
+app.use(cors({
+    origin: true,              // Allows any origin (good for development)
+    credentials: true,         // Allows cookies / authorization headers
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// ---------- Handle Preflight (OPTIONS) Requests ----------
+// Browsers send an OPTIONS request before a non-simple request (e.g., POST with JSON)
+// This returns a 204 (No Content) to let the browser know CORS is allowed
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);   // No body, just status
+    }
+    next(); // Continue to next middleware for non-OPTIONS requests
+});
+
+// ---------- Parse JSON Bodies ----------
+// This middleware automatically parses incoming JSON request bodies
+// and makes them available as `req.body`
 app.use(express.json());
 
-// Home
+// ---------- Root Route (Health Check) ----------
+// Simple endpoint to verify the server is running
 app.get("/", (req, res) => {
     res.json({
-        message: "Animal API is running!",
-        endpoints: {
-            getAll: "GET /animals",
-            getOne: "GET /animals/:id",
-            create: "POST /animals",
-            update: "PUT /animals/:id",
-            delete: "DELETE /animals/:id"
-        }
+        message: "Animal API is running!"
     });
 });
 
-// GET all animals
-app.get("/animals", async (req, res) => {
-    try {
-        const { numLegs } = req.query;
+// ---------- Mount Route Handlers ----------
+// All routes starting with /animals will be handled by animalRoutes
+// Example: GET /animals → animalRoutes handles it
+app.use("/animals", animalRoutes);
 
-        let sql = "SELECT id, name, num_legs AS numLegs FROM animals";
-        const params = [];
+// All routes starting with /auth will be handled by authRoutes
+// Example: POST /auth/login → handled by authRoutes
+app.use("/auth", authRoutes);
 
-        if (numLegs !== undefined) {
-            sql += " WHERE num_legs = ?";
-            params.push(Number(numLegs));
-        }
-
-        const [animals] = await pool.execute(sql, params);
-
-        res.json({ animals });
-
-    } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: error.message,
-            code: error.code,
-            sql: error.sql
-        });
-    }
+// ---------- Start the Server ----------
+// Binding to '0.0.0.0' makes the server accessible from other devices on the network
+// (useful if you're testing from a phone or another computer)
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-// GET animal by id
-app.get("/animals/:id", async (req, res) => {
-    try {
-
-        const [animals] = await pool.execute(
-            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
-            [req.params.id]
-        );
-
-        if (animals.length === 0) {
-            return res.status(404).json({
-                message: "Animal not found"
-            });
-        }
-
-        res.json(animals[0]);
-
-    } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-            message: error.message,
-            code: error.code,
-            sql: error.sql
-        });
-
-    }
-});
-
-// POST
-app.post("/animals", async (req, res) => {
-
-    try {
-
-        const { name, numLegs } = req.body;
-
-        if (!name || numLegs === undefined) {
-            return res.status(400).json({
-                message: "name and numLegs are required"
-            });
-        }
-
-        const [result] = await pool.execute(
-            "INSERT INTO animals(name,num_legs) VALUES(?,?)",
-            [name.trim().toUpperCase(), Number(numLegs)]
-        );
-
-        const [animal] = await pool.execute(
-            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
-            [result.insertId]
-        );
-
-        res.status(201).json({
-            message: "Animal added",
-            animal: animal[0]
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-            message: error.message,
-            code: error.code,
-            sql: error.sql
-        });
-
-    }
-
-});
-
-// PUT
-app.put("/animals/:id", async (req, res) => {
-
-    try {
-
-        const id = req.params.id;
-        const { name, numLegs } = req.body;
-
-        const [rows] = await pool.execute(
-            "SELECT * FROM animals WHERE id=?",
-            [id]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message: "Animal not found"
-            });
-        }
-
-        const updatedName = name ? name.trim().toUpperCase() : rows[0].name;
-        const updatedLegs =
-            numLegs !== undefined ? Number(numLegs) : rows[0].num_legs;
-
-        await pool.execute(
-            "UPDATE animals SET name=?,num_legs=? WHERE id=?",
-            [updatedName, updatedLegs, id]
-        );
-
-        const [updated] = await pool.execute(
-            "SELECT id,name,num_legs AS numLegs FROM animals WHERE id=?",
-            [id]
-        );
-
-        res.json({
-            message: "Animal updated",
-            animal: updated[0]
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-            message: error.message,
-            code: error.code,
-            sql: error.sql
-        });
-
-    }
-
-});
-
-// DELETE
-app.delete("/animals/:id", async (req, res) => {
-
-    try {
-
-        const [result] = await pool.execute(
-            "DELETE FROM animals WHERE id=?",
-            [req.params.id]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message: "Animal not found"
-            });
-        }
-
-        res.json({
-            message: "Animal deleted successfully"
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-            message: error.message,
-            code: error.code,
-            sql: error.sql
-        });
-
-    }
-
-});
-
-// Start server
-async function startServer() {
-
-    try {
-
-        const connection = await pool.getConnection();
-
-        console.log("✅ Connected to MySQL!");
-
-        connection.release();
-
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        process.exit(1);
-
-    }
-
-}
-
-startServer();
