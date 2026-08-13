@@ -1,24 +1,31 @@
-// routes/animalRoutes.js
-
 import express from "express";
-import authenticateToken from "../middleware/authenticateToken.js";
-import { 
-  getAnimals, 
-  getAnimalById, 
-  createAnimal, 
-  updateAnimal, 
-  deleteAnimal 
-} from "../controllers/animalController.js";
+import db from "../db.js"; // or your database connection
 
 const router = express.Router();
 
-// Public routes
-router.get("/", getAnimals);
-router.get("/:id", getAnimalById);
+// This handles GET requests to /animals
+router.get("/", async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM animals");
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
-// Protected routes
-router.post("/", authenticateToken, createAnimal);
-router.put("/:id", authenticateToken, updateAnimal);
-router.delete("/:id", authenticateToken, deleteAnimal);
+// This handles POST requests to /animals
+router.post("/", async (req, res) => {
+    // ... your add animal logic
+});
 
-export default router;
+//  This handles PUT requests to /animals/:id
+router.put("/:id", async (req, res) => {
+    // ... your update logic
+});
+
+//  This handles DELETE requests to /animals/:id
+router.delete("/:id", async (req, res) => {
+    // ... your delete logic
+});
+
+export default router; // ← MUST export the router
